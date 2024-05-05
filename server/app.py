@@ -18,32 +18,60 @@ db.init_app(app)
 def home():
     return '<h1>Bakery GET-POST-PATCH-DELETE API</h1>'
 
-@app.route('/bakeries')
-def bakeries():
-    bakeries = [bakery.to_dict() for bakery in Bakery.query.all()]
-    return make_response(  bakeries,   200  )
+@app.route('/baked_goods', methods=['POST'])
+def create_bakery():
+    print("Received POST request to /baked_goods")
 
-@app.route('/bakeries/<int:id>')
-def bakery_by_id(id):
+    if request.method == 'POST':
+        if request.headers['Content-Type'] == 'application/json':
+            data = request.json
+            print("Received JSON data json:", data)
+        else:
+            data = request.form
+            print("Received JSON data form:", data)
+        
+        name = data.get('name')
+        print("Extracted name from JSON data:", name)
 
-    bakery = Bakery.query.filter_by(id=id).first()
-    bakery_serialized = bakery.to_dict()
-    return make_response ( bakery_serialized, 200  )
+        if name:
+            new_baked_good = BakedGood(name=name)
+            db.session.add(new_baked_good)
+            db.session.commit()
+            print("New bakery added to the database:", new_baked_good)
 
-@app.route('/baked_goods/by_price')
-def baked_goods_by_price():
-    baked_goods_by_price = BakedGood.query.order_by(BakedGood.price.desc()).all()
-    baked_goods_by_price_serialized = [
-        bg.to_dict() for bg in baked_goods_by_price
-    ]
-    return make_response( baked_goods_by_price_serialized, 200  )
-   
+            # Retrieve the newly created baked good from the database
+            new_baked_good = BakedGood.query.filter_by(name=name).first()
 
-@app.route('/baked_goods/most_expensive')
-def most_expensive_baked_good():
-    most_expensive = BakedGood.query.order_by(BakedGood.price.desc()).limit(1).first()
-    most_expensive_serialized = most_expensive.to_dict()
-    return make_response( most_expensive_serialized,   200  )
+            return jsonify({'id': new_baked_good.id, 'name': new_baked_good.name}), 201
+        else:
+            print("Name is required. Returning error response.")
+            return jsonify({'error': 'Name is required'}), 400
+
+@app.route('/bakeries/<int:id>', methods=['PATCH'])
+def update_bakery(id):
+    bakery = Bakery.query.get(id)
+    if bakery:
+        print("NU")
+        data = request.form
+        print("NU@")
+        if 'name' in data:
+            bakery.name = data['name']
+        db.session.commit()
+        return jsonify({'message': 'Bakery updated successfully'}), 200
+    else:
+        return jsonify({'error': 'Bakery not found'}), 404
+
+# Delete Baked Goods Route
+@app.route('/baked_goods/<int:id>', methods=['DELETE'])
+def delete_baked_good(id):
+    baked_good = BakedGood.query.get(id)
+    if not baked_good:
+        return jsonify({'error': 'Baked good not found'}), 404
+
+    db.session.delete(baked_good)
+    db.session.commit()
+
+    return jsonify({'message': 'Baked good deleted successfully'}), 200
 
 if __name__ == '__main__':
-    app.run(port=5555, debug=True)
+    app.run(debug=True)
